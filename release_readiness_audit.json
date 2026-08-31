@@ -1,0 +1,98 @@
+{
+  "release": {
+    "version": "2.17.0",
+    "scheduled_date": "2026-07-30",
+    "decision": "do-not-cut"
+  },
+  "gates": [
+    {
+      "name": "Demo notebook sweep",
+      "state": "missing",
+      "evidence": "Releases/demo_sweep_results.csv",
+      "detail": "No recorded Wednesday sweep for v2.17.0."
+    },
+    {
+      "name": "CI and acceptance confirmation",
+      "state": "missing",
+      "evidence": "Configs/release_config.yaml",
+      "detail": "CI green is required, but no candidate CI confirmation is among the eleven inputs."
+    },
+    {
+      "name": "Gemma-3 hotfix disposition",
+      "state": "passed",
+      "evidence": "Notes/issue_triage_queue.csv",
+      "detail": "#1121 is closed in v2.16.1. Open unrelated in-progress bugs: 1108."
+    },
+    {
+      "name": "Gemma-3 numerical evidence",
+      "state": "contradiction",
+      "evidence": "Configs/acceptance_test_output_v2.16.0.json; Notes/triage_1121_gemma3_logits.md",
+      "detail": "Recorded pass at 3.9e-05, but triage records 1.3e-04 over 1.0e-04."
+    }
+  ],
+  "blockers": [
+    "No recorded Wednesday sweep for v2.17.0.",
+    "CI green is required, but no candidate CI confirmation is among the eleven inputs.",
+    "Recorded pass at 3.9e-05, but triage records 1.3e-04 over 1.0e-04."
+  ],
+  "measurements": {
+    "acceptance_summary": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0
+    },
+    "threshold_abs_logit_delta": 0.0001,
+    "gemma3_recorded_max_logit_delta": 3.9e-05,
+    "gemma3_triage_max_logit_delta": 0.00013
+  },
+  "provenance": {
+    "evidence_root": "/workspace/scratch/3e47a61ddb58/release_evidence",
+    "paths": [
+      {
+        "path": "Configs/acceptance_test_output_v2.16.0.json",
+        "sha256": "0bb7f4e1ea144fb5cec44a70b88f01cb7bfcc595c286b34e001d0537563cb3ac"
+      },
+      {
+        "path": "Notes/triage_1121_gemma3_logits.md",
+        "sha256": "cbbf92bbb32e811acee20c1458b93386c69350c1bb449f5867d12cecf6789bf1"
+      },
+      {
+        "path": "Adapters/acceptance_test_notes.md",
+        "sha256": "4a67acb976cc0d9fc33acc4ea042a12da43f236d42c4c71799a1562bd2dffb0f"
+      },
+      {
+        "path": "Adapters/adapter_authoring_checklist.md",
+        "sha256": "f7164f68f4240766e91336f959c2d8d34356fd17b6a9ba83b939c1ad720c2508"
+      },
+      {
+        "path": "Adapters/weight_conversion_checklist.csv",
+        "sha256": "37d7392c49293559841571b6d1282c2837cb13741947cfc4849053201c541f50"
+      },
+      {
+        "path": "Configs/release_config.yaml",
+        "sha256": "b2fc7e2b497b2d7164c821372613c47f46879fa285b936c90853b89d7ac4e581"
+      },
+      {
+        "path": "Releases/release_checklist.md",
+        "sha256": "0eeacfe860fbe15cd246cdbdfca33d26e0212d30b689614c45358c8d45d3744b"
+      },
+      {
+        "path": "Releases/demo_sweep_results.csv",
+        "sha256": "2a7d583947573804211a7987e8404398b5bf93e8ea5b2378d071f258fed1b941"
+      },
+      {
+        "path": "Notes/issue_triage_queue.csv",
+        "sha256": "65ea791ee7f2e69db72862e6078af0937bba43e1bf5f6e319b01eaf4bbc11937"
+      },
+      {
+        "path": "Releases/pr_merge_log.csv",
+        "sha256": "951c1f9b132563be745334e7db38fe6a52584b859c53ccdedd0574a00b90fdb3"
+      },
+      {
+        "path": "Releases/release_notes_v2.16.1_2026-06-27.md",
+        "sha256": "1ef337ef77055cd9fc45ab5b22bad44d6e3908bcacce25ae25b953267ec4d91e"
+      }
+    ]
+  },
+  "repository_exception": "This fork has no dev branch; release-readiness-gate is based on main."
+}
