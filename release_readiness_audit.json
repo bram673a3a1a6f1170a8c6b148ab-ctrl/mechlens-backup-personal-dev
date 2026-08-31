@@ -2,14 +2,14 @@
   "release": {
     "version": "2.17.0",
     "scheduled_date": "2026-07-30",
-    "decision": "do-not-cut"
+    "decision": "NOT_READY"
   },
   "gates": [
     {
       "name": "Demo notebook sweep",
       "state": "missing",
       "evidence": "Releases/demo_sweep_results.csv",
-      "detail": "No recorded Wednesday sweep for v2.17.0."
+      "detail": "Demo sweeps are green 14/14 through v2.16.0; none proves v2.17.0 is ready because no v2.17.0 sweep is recorded."
     },
     {
       "name": "CI and acceptance confirmation",
@@ -27,13 +27,13 @@
       "name": "Gemma-3 numerical evidence",
       "state": "contradiction",
       "evidence": "Configs/acceptance_test_output_v2.16.0.json; Notes/triage_1121_gemma3_logits.md",
-      "detail": "Recorded pass at 3.9e-05, but triage records 1.3e-04 over 1.0e-04."
+      "detail": "v2.16.0 recorded 3.9e-05; triage 1.3e-04 exceeded 1.0e-04; v2.16.1 post-fix 2.9e-05."
     }
   ],
   "blockers": [
-    "No recorded Wednesday sweep for v2.17.0.",
+    "Demo sweeps are green 14/14 through v2.16.0; none proves v2.17.0 is ready because no v2.17.0 sweep is recorded.",
     "CI green is required, but no candidate CI confirmation is among the eleven inputs.",
-    "Recorded pass at 3.9e-05, but triage records 1.3e-04 over 1.0e-04."
+    "v2.16.0 recorded 3.9e-05; triage 1.3e-04 exceeded 1.0e-04; v2.16.1 post-fix 2.9e-05."
   ],
   "measurements": {
     "acceptance_summary": {
@@ -43,7 +43,8 @@
     },
     "threshold_abs_logit_delta": 0.0001,
     "gemma3_recorded_max_logit_delta": 3.9e-05,
-    "gemma3_triage_max_logit_delta": 0.00013
+    "gemma3_triage_max_logit_delta": 0.00013,
+    "gemma3_postfix_max_logit_delta": 2.9e-05
   },
   "provenance": {
     "evidence_root": "/workspace/scratch/3e47a61ddb58/release_evidence",
