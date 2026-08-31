@@ -34,7 +34,12 @@ REQUIRED_PATHS = (
     "Releases/release_notes_v2.16.1_2026-06-27.md",
 )
 THRESHOLD = 1e-4
-BRANCH_EXCEPTION = "This fork has no dev branch; release-readiness-gate is based on main."
+BRANCH_EXCEPTION = (
+    "This fork currently exposes main and gh-pages; it has no dev branch. Although the "
+    "contributing guide normally directs pull requests to dev, this release-readiness work was "
+    "created from main on the unmerged release-readiness-gate branch. No pull request has been "
+    "opened against any branch."
+)
 
 
 @dataclass(frozen=True)
@@ -180,7 +185,7 @@ def _issue_gate(issue_queue: str) -> Gate:
     suffix = f" Open unrelated in-progress bugs: {', '.join(open_bugs)}." if open_bugs else ""
     return Gate(
         "Gemma-3 hotfix disposition",
-        "passed",
+        "historical_fix_recorded",
         "Notes/issue_triage_queue.csv",
         "#1121 is closed in v2.16.1." + suffix,
     )
@@ -247,31 +252,72 @@ def _dashboard(audit_data: dict[str, Any]) -> str:
     measurements = audit_data["measurements"]
     return f"""<!doctype html>
 <html lang=\"en\"><meta charset=\"utf-8\"><title>Release readiness</title>
-<style>body{{font-family:system-ui,sans-serif;max-width:960px;margin:3rem auto;padding:0 1rem;color:#172033}}h1{{margin-bottom:.2rem}}.decision{{font-size:1.5rem;font-weight:700;color:#a33}}table{{border-collapse:collapse;width:100%;margin:1.5rem 0}}td,th{{border:1px solid #ccd3df;padding:.7rem;text-align:left}}.passed{{color:#16753a;font-weight:700}}.missing,.failed,.contradiction{{color:#af2638;font-weight:700}}code{{background:#eef2f7;padding:.15rem .3rem}}</style>
+<style>body{{font-family:system-ui,sans-serif;max-width:960px;margin:3rem auto;padding:0 1rem;color:#172033}}h1{{margin-bottom:.2rem}}.decision{{font-size:1.5rem;font-weight:700;color:#a33}}table{{border-collapse:collapse;width:100%;margin:1.5rem 0}}td,th{{border:1px solid #ccd3df;padding:.7rem;text-align:left}}.passed{{color:#16753a;font-weight:700}}.historical_fix_recorded{{color:#805b00;font-weight:700}}.missing,.failed,.contradiction{{color:#af2638;font-weight:700}}code{{background:#eef2f7;padding:.15rem .3rem}}</style>
 <h1>Release readiness: v{html.escape(release['version'])}</h1><p>Scheduled date: {html.escape(release['scheduled_date'])}</p>
 <p class=\"decision\">Decision: {html.escape(release['decision'])}</p>
 <table><thead><tr><th>Gate</th><th>State</th><th>Evidence</th></tr></thead><tbody>{rows}</tbody></table>
-<h2>Gemma-3 measurements</h2><p>v2.16.0 recorded {measurements['gemma3_recorded_max_logit_delta']:.1e}; triage {measurements['gemma3_triage_max_logit_delta']:.1e}; v2.16.1 post-fix {measurements['gemma3_postfix_max_logit_delta']:.1e}; threshold {measurements['threshold_abs_logit_delta']:.1e}.</p>
+<h2>Gemma-3 measurements</h2><table><thead><tr><th>Measurement</th><th>Value</th><th>Source</th></tr></thead><tbody><tr><td>v2.16.0 recorded maximum logit delta</td><td>{measurements['gemma3_recorded_max_logit_delta']:.1e}</td><td><code>Configs/acceptance_test_output_v2.16.0.json</code></td></tr><tr><td>#1121 triage maximum logit delta</td><td>{measurements['gemma3_triage_max_logit_delta']:.1e}</td><td><code>Notes/triage_1121_gemma3_logits.md</code></td></tr><tr><td>v2.16.1 post-fix maximum logit delta</td><td>{measurements['gemma3_postfix_max_logit_delta']:.1e}</td><td><code>Notes/triage_1121_gemma3_logits.md</code></td></tr><tr><td>Acceptance threshold</td><td>{measurements['threshold_abs_logit_delta']:.1e}</td><td><code>Configs/acceptance_test_output_v2.16.0.json</code></td></tr></tbody></table>
 <h2>Blockers</h2><ul>{blockers}</ul><h2>Repository exception</h2><p>{html.escape(audit_data['repository_exception'])}</p>
 <h2>Provenance</h2><p>All eleven supplied paths are recorded in <code>release_readiness_audit.json</code>.</p></html>"""
 
 
 def _notes(audit_data: dict[str, Any]) -> str:
-    release = audit_data["release"]
-    blockers = "\n".join(f"- {blocker}" for blocker in audit_data["blockers"])
-    return f"""# Maintainer release-readiness notes
+    required_paths = "\n".join(f"- `{path}`" for path in REQUIRED_PATHS)
+    return f"""# Release-readiness gate
 
-## Decision
+## What this checks
 
-**v{release['version']} ({release['scheduled_date']}): {release['decision']}**
+This CLI reads the eleven release-evidence files and writes a machine-readable audit and a self-contained dashboard for the configured next release. It reports release readiness; it does not certify that a historical hotfix applies to the next candidate.
 
-## Blocking evidence
+## Required evidence
 
-{blockers}
+Place these exact relative paths under one evidence root:
 
-## Interpretation
+{required_paths}
 
-The v2.16.0 short-prompt result was 3.9e-5, triage found 1.3e-4 against the 1e-4 threshold, and the v2.16.1 post-fix result was 2.9e-5. An all-passed short-prompt summary is not a clean numerical pass when the recorded triage evidence exceeds the same threshold. Resolve that contradiction with a release-candidate Gemma-3 evidence bundle: fixed short and stress prompts, intermediate-activation deltas, checkpoint/dependency revisions, and the configured threshold.
+The audit records every required path and its SHA-256. Missing any one is an error.
+
+## Run it
+
+```bash
+uv run python -m transformer_lens.tools.release_readiness \\
+  --evidence-root /path/to/release-evidence \\
+  --output-root .
+```
+
+This regenerates `release_readiness_audit.json`, `release_readiness_dashboard.html`, and `MAINTAINER_NOTES.md`.
+
+## Read the result
+
+`release.decision` is `READY` when no gate blocks release and `NOT_READY` when at least one gate is `missing`, `failed`, or `contradiction`.
+
+| State | Meaning | Release effect |
+| --- | --- | --- |
+| `passed` | Candidate-specific evidence meets this gate. | Non-blocking |
+| `historical_fix_recorded` | A prior issue is recorded as fixed in a prior release; this is context only, not candidate verification. | Non-blocking |
+| `missing` | Required candidate evidence was not supplied. | Blocking |
+| `failed` | Supplied evidence fails its threshold or requirement. | Blocking |
+| `contradiction` | A summary says pass while another supplied source breaks the same threshold. | Blocking |
+
+For Gemma-3, read the source-labelled v2.16.0 recorded result, #1121 triage result, v2.16.1 post-fix result, and configured threshold together. A historical post-fix result does not substitute for candidate evidence. A green historical demo sweep, including 14/14 through v2.16.0, does not establish the configured next release is ready: the candidate needs its own sweep.
+
+## Before cutting
+
+Resolve every blocker, rerun the CLI against the updated evidence root, and inspect:
+
+1. `release_readiness_audit.json` for the decision, blockers, measurements, and provenance.
+2. `release_readiness_dashboard.html` for reviewer-facing presentation.
+3. The listed source files for any contradiction.
+
+## Verify the implementation
+
+```bash
+make format
+uv run mypy transformer_lens/tools/release_readiness.py
+uv run pytest tests/unit/tools/test_release_readiness.py -q
+```
+
+The tests cover a Gemma delta below `1e-4` passing, a delta above `1e-4` failing, a 6/6-style summary contradicted by threshold-breaking triage evidence, and historical green demo sweeps not being treated as evidence for the next release.
 
 ## Repository exception
 
