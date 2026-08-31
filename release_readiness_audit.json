@@ -19,7 +19,7 @@
     },
     {
       "name": "Gemma-3 hotfix disposition",
-      "state": "passed",
+      "state": "historical_fix_recorded",
       "evidence": "Notes/issue_triage_queue.csv",
       "detail": "#1121 is closed in v2.16.1. Open unrelated in-progress bugs: 1108."
     },
@@ -95,5 +95,5 @@
       }
     ]
   },
-  "repository_exception": "This fork has no dev branch; release-readiness-gate is based on main."
+  "repository_exception": "This fork currently exposes main and gh-pages; it has no dev branch. Although the contributing guide normally directs pull requests to dev, this release-readiness work was created from main on the unmerged release-readiness-gate branch. No pull request has been opened against any branch."
 }
