@@ -1,5 +1,6 @@
 from transformer_lens.tools.release_readiness import (
     _demo_gate,
+    _issue_gate,
     evaluate_gemma_acceptance,
 )
 
@@ -38,3 +39,8 @@ def test_historical_demo_sweeps_do_not_prove_the_next_release_is_ready():
     assert gate.state == "missing"
     assert "green 14/14 through v2.16.0" in gate.detail
     assert "none proves v2.17.0 is ready" in gate.detail
+
+
+def test_historical_hotfix_is_not_reported_as_a_candidate_pass():
+    gate = _issue_gate("issue,label,status\n1121,bug,closed in v2.16.1\n")
+    assert gate.state == "historical_fix_recorded"
