@@ -64,6 +64,21 @@ def _triage_max_delta(triage: str) -> float | None:
     return float(match.group(1)) if match else None
 
 
+def _triage_postfix_delta(triage: str) -> float | None:
+    match = re.search(r"Max delta back to ([0-9]+(?:\.[0-9]+)?e-[0-9]+)", triage)
+    return float(match.group(1)) if match else None
+
+
+def _gemma_measurement_detail(
+    recorded: float, triage: float, postfix: float | None, threshold: float
+) -> str:
+    postfix_detail = f"; v2.16.1 post-fix {postfix:.1e}" if postfix is not None else ""
+    return (
+        f"v2.16.0 recorded {recorded:.1e}; triage {triage:.1e} exceeded "
+        f"{threshold:.1e}{postfix_detail}."
+    )
+
+
 def _gemma_result(acceptance: dict[str, Any]) -> dict[str, Any] | None:
     return next(
         (result for result in acceptance.get("results", []) if result.get("family") == "gemma-3"),
@@ -83,6 +98,7 @@ def evaluate_gemma_acceptance(
 
     recorded_delta = float(gemma["max_logit_delta"])
     triage_delta = _triage_max_delta(triage)
+    postfix_delta = _triage_postfix_delta(triage)
     recorded_pass = bool(gemma.get("pass")) and recorded_delta <= threshold
 
     if triage_delta is not None and triage_delta > threshold and recorded_pass:
@@ -90,7 +106,7 @@ def evaluate_gemma_acceptance(
             "Gemma-3 numerical evidence",
             "contradiction",
             "Configs/acceptance_test_output_v2.16.0.json; Notes/triage_1121_gemma3_logits.md",
-            f"Recorded pass at {recorded_delta:.1e}, but triage records {triage_delta:.1e} over {threshold:.1e}.",
+            _gemma_measurement_detail(recorded_delta, triage_delta, postfix_delta, threshold),
         )
     if not recorded_pass or (triage_delta is not None and triage_delta > threshold):
         delta = max(recorded_delta, triage_delta or recorded_delta)
@@ -112,11 +128,19 @@ def _demo_gate(demo_sweep: str, version: str) -> Gate:
     rows = list(csv.DictReader(demo_sweep.splitlines()))
     row = next((candidate for candidate in rows if candidate.get("release") == version), None)
     if row is None:
+        prior_rows = [candidate for candidate in rows if candidate.get("result") == "green"]
+        latest_prior = prior_rows[-1] if prior_rows else None
+        historical_detail = (
+            f"Demo sweeps are green {latest_prior.get('notebooks_passed')}/"
+            f"{latest_prior.get('notebooks_run')} through v{latest_prior.get('release')}; "
+            if latest_prior is not None
+            else "No prior green demo sweep is recorded; "
+        )
         return Gate(
             "Demo notebook sweep",
             "missing",
             "Releases/demo_sweep_results.csv",
-            f"No recorded Wednesday sweep for v{version}.",
+            f"{historical_detail}none proves v{version} is ready because no v{version} sweep is recorded.",
         )
     state = "passed" if row.get("result") == "green" else "failed"
     return Gate(
@@ -186,7 +210,7 @@ def audit(evidence_root: Path) -> dict[str, Any]:
         "release": {
             "version": version,
             "scheduled_date": date,
-            "decision": "do-not-cut" if blockers else "ready-to-cut",
+            "decision": "NOT_READY" if blockers else "READY",
         },
         "gates": [asdict(gate) for gate in gates],
         "blockers": blockers,
@@ -195,6 +219,7 @@ def audit(evidence_root: Path) -> dict[str, Any]:
             "threshold_abs_logit_delta": acceptance.get("threshold_abs_logit_delta", THRESHOLD),
             "gemma3_recorded_max_logit_delta": gemma.get("max_logit_delta"),
             "gemma3_triage_max_logit_delta": _triage_max_delta(triage),
+            "gemma3_postfix_max_logit_delta": _triage_postfix_delta(triage),
         },
         "provenance": {
             "evidence_root": str(evidence_root),
@@ -219,12 +244,14 @@ def _dashboard(audit_data: dict[str, Any]) -> str:
     )
     blockers = "".join(f"<li>{html.escape(blocker)}</li>" for blocker in audit_data["blockers"])
     release = audit_data["release"]
+    measurements = audit_data["measurements"]
     return f"""<!doctype html>
 <html lang=\"en\"><meta charset=\"utf-8\"><title>Release readiness</title>
 <style>body{{font-family:system-ui,sans-serif;max-width:960px;margin:3rem auto;padding:0 1rem;color:#172033}}h1{{margin-bottom:.2rem}}.decision{{font-size:1.5rem;font-weight:700;color:#a33}}table{{border-collapse:collapse;width:100%;margin:1.5rem 0}}td,th{{border:1px solid #ccd3df;padding:.7rem;text-align:left}}.passed{{color:#16753a;font-weight:700}}.missing,.failed,.contradiction{{color:#af2638;font-weight:700}}code{{background:#eef2f7;padding:.15rem .3rem}}</style>
 <h1>Release readiness: v{html.escape(release['version'])}</h1><p>Scheduled date: {html.escape(release['scheduled_date'])}</p>
 <p class=\"decision\">Decision: {html.escape(release['decision'])}</p>
 <table><thead><tr><th>Gate</th><th>State</th><th>Evidence</th></tr></thead><tbody>{rows}</tbody></table>
+<h2>Gemma-3 measurements</h2><p>v2.16.0 recorded {measurements['gemma3_recorded_max_logit_delta']:.1e}; triage {measurements['gemma3_triage_max_logit_delta']:.1e}; v2.16.1 post-fix {measurements['gemma3_postfix_max_logit_delta']:.1e}; threshold {measurements['threshold_abs_logit_delta']:.1e}.</p>
 <h2>Blockers</h2><ul>{blockers}</ul><h2>Repository exception</h2><p>{html.escape(audit_data['repository_exception'])}</p>
 <h2>Provenance</h2><p>All eleven supplied paths are recorded in <code>release_readiness_audit.json</code>.</p></html>"""
 
@@ -244,7 +271,7 @@ def _notes(audit_data: dict[str, Any]) -> str:
 
 ## Interpretation
 
-An all-passed short-prompt summary is not a clean numerical pass when the recorded triage evidence exceeds the same threshold. Resolve that contradiction with a release-candidate Gemma-3 evidence bundle: fixed short and stress prompts, intermediate-activation deltas, checkpoint/dependency revisions, and the configured threshold.
+The v2.16.0 short-prompt result was 3.9e-5, triage found 1.3e-4 against the 1e-4 threshold, and the v2.16.1 post-fix result was 2.9e-5. An all-passed short-prompt summary is not a clean numerical pass when the recorded triage evidence exceeds the same threshold. Resolve that contradiction with a release-candidate Gemma-3 evidence bundle: fixed short and stress prompts, intermediate-activation deltas, checkpoint/dependency revisions, and the configured threshold.
 
 ## Repository exception
 
