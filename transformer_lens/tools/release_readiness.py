@@ -309,6 +309,11 @@ Resolve every blocker, rerun the CLI against the updated evidence root, and insp
 2. `release_readiness_dashboard.html` for reviewer-facing presentation.
 3. The listed source files for any contradiction.
 
+## Current limitations
+
+- The CI gate cannot currently clear. `release_config.yaml` requires green CI, but none of the eleven inputs contains a candidate CI confirmation, so the CLI always reports that gate as `missing`. Add a defined candidate-CI evidence source and have the CLI evaluate it.
+- The Gemma-3 contradiction is permanent by construction. The fixed inputs always pair the historical v2.16.0 passing record with #1121's threshold-breaking observation, so the CLI will continue to report `contradiction`. Add a named v2.17.0 candidate acceptance input and evaluate it separately, while retaining the historical incident as context.
+
 ## Verify the implementation
 
 ```bash
